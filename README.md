@@ -28,7 +28,7 @@ This plugin creates four commands
 Additionally accepts args to absolute filepath e.g. `:AEMImportFolder ~/projects/repo/ui.apps/src/main/content/jcr_root/apps`
 
 # TODO:
-- [ ] Config for AEM location
+- [x] Config for AEM location
 - [ ] Launch author, publish and dispatcher
 - [ ] Show logs (aemerror, stdout) for both instances
   - [ ] Floating window
@@ -41,3 +41,8 @@ Additionally accepts args to absolute filepath e.g. `:AEMImportFolder ~/projects
 - [ ] Launch `npm run build` for the frontend package
   - [ ] Only in the background
   - [ ] `AEMExportFile` in `ui.frontend` should automatically export the whole frontend folder
+- [ ] chores
+  - [ ] Modularize the code
+  - [ ] Proper error logging
+  - [ ] Ensure things are closed when nvim closes
+
