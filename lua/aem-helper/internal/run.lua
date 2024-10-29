@@ -31,7 +31,8 @@ M.run = function(cmd, id, opts)
 		args = args,
 		stdio = { nil, stdout, stderr },
 		cwd = opts.cwd,
-		env = opts.env or {}
+		env = opts.env or {},
+		detached = true,
 	}, function(code, signal) -- on_exit
 		if code ~= 0 then
 			vim.schedule(function()
@@ -52,6 +53,10 @@ M.run = function(cmd, id, opts)
 		stdout = stdout,
 		stderr = stderr
 	}
+
+	-- vim.keymap.set("n", "q", function()
+	-- 	uv.kill(pid, "sigterm")
+	-- end, { buffer = true, noremap = true, silent = true })
 
 	-- Cleanup
 	vim.api.nvim_create_autocmd('VimLeavePre', {

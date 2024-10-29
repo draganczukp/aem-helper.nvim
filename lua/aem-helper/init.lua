@@ -8,12 +8,9 @@ local runner = require("aem-helper.internal.run")
 ---@field jar_file string
 ---@field author {folder: string, port: number}
 ---@field publish {folder: string, port: number}
----@field dispatcher {folder: string, config: string}
+---@field dispatcher {folder: string, config: string, port: number}
 
 local M = {}
-
-local au_group = vim.api.nvim_create_augroup('aem_helper', { clear = true })
-
 
 local function get_plugin_dir()
 	local str = debug.getinfo(2, "S").source:sub(2)
@@ -68,33 +65,20 @@ function M.start_aem(env)
 	--- @type AemHelperOpts
 	local _opts = _G['aem_helper'].opts
 
-	vim.notify("Starting "..env)
+	vim.notify("Starting " .. env)
 	local path = vim.fs.joinpath(_opts.aem_path, _opts.author.folder);
 	if not vim.fn.isdirectory(path) then
 		vim.notify("Path " .. path .. " does not exist. Creating it now")
 		vim.fn.mkdir(path, "p");
 	end
 
-	local args = { "java", "-jar", _opts.jar_file, "-port", tostring(_opts[env].port), "-nobrowser", "-b", _opts[env]
-		.folder, "-nointeractive", "-r", env }
+	local cmd = { "java", "-jar", _opts.jar_file, "-port", tostring(_opts[env].port), "-nobrowser", "-b", _opts[env]
+		.folder, "-nointeractive", "-r", env, "-nofork" }
 
-	local _, stderr, pid = runner.run(args, "aem_" .. env, {
+	-- NOTE: AEM pushes all output to stderr. And it's useless for us here, so it's getting ignored
+	local _, _, pid = runner.run(cmd, "aem_" .. env, {
 		cwd = _opts.aem_path,
 	})
-
-	stderr:read_start(function(err, data)
-		if err then
-			vim.schedule(function()
-				log.error("Error reading stderr: " .. err)
-			end)
-			return
-		end
-		if data then
-			vim.schedule(function()
-				log.debug("["..env.."] stderr: " .. data)
-			end)
-		end
-	end)
 
 	log.debug("Started AEM " .. env .. " with pid " .. pid)
 end
@@ -102,7 +86,26 @@ end
 function M.start_dispatcher()
 	--- @type AemHelperOpts
 	local _opts = _G['aem_helper'].opts;
-	-- TODO:
+
+	local dispatcher_folder = vim.fs.joinpath(_opts.aem_path, _opts.dispatcher.folder);
+
+	local cmd = { "bin/docker_run.sh", _opts.dispatcher.config, "172.17.0.1" .. ":" .. _opts.publish.port, _opts
+		.dispatcher.port }
+
+	local _, stderr, pid = runner.run(cmd, "aem_dispatcher", {
+		cwd = dispatcher_folder
+	})
+
+	stderr:read_start(function(err, data)
+		if err then
+			log.error(err)
+		end
+		if data then
+			log.debug(data)
+		end
+	end)
+
+	log.debug("Started AEM dispatcher with pid " .. pid)
 end
 
 function M.launch()
@@ -147,6 +150,8 @@ function M.setup(opts)
 
 	-- NOTE: Testing only
 	vim.api.nvim_create_user_command('AEMTest', function() M.launch() end, {})
+
+	vim.keymap.set("n", "<Plug>(LaunchAem)", function() M.launch() end, { noremap = true, silent = true })
 
 	-- -- LEGACY
 	-- vim.cmd([[
