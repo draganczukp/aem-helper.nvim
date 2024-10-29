@@ -1,16 +1,17 @@
 return {
-	aem_path = nil, -- absolute path to the AEM quickstart jar file
+	aem_path = nil,
 	jar_file = 'crx-quickstart.jar',
 	author = {
-		folder = "author/crx-quickstart", -- path to crx-quickstart folder, absolute or relative to `aem_path`
+		folder = "author",
 		port = 4202
 	},
 	publish = {
-		folder = "publish/crx-quickstart", -- path to crx-quickstart folder
+		folder = "publish",
 		port = 4203
 	},
 	dispatcher = {
-		folder = "dispatcher", -- path to dispatcher SDK folder
-		config = "dispatcher_config" -- path to dispatcher configuration folder
+		folder = "dispatcher",
+		config = "dispatcher_config",
+		port = 8080
 	}
 }
