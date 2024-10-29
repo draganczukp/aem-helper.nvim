@@ -1,4 +1,6 @@
-local log = require("sync-aem.log")
+local log = require("aem-helper.internal.log")
+
+local runner = require("aem-helper.internal.run")
 
 ---
 ---@class AemHelperOpts
@@ -65,117 +67,93 @@ end
 function M.start_aem(env)
 	--- @type AemHelperOpts
 	local _opts = _G['aem_helper'].opts
-	local uv = vim.uv;
 
+	vim.notify("Starting "..env)
 	local path = vim.fs.joinpath(_opts.aem_path, _opts.author.folder);
 	if not vim.fn.isdirectory(path) then
-		log.debug("Path " .. path .. " does not exist")
+		vim.notify("Path " .. path .. " does not exist. Creating it now")
 		vim.fn.mkdir(path, "p");
 	end
 
-	local args = { "-jar", _opts.jar_file, "-port", tostring(_opts[env].port), "-nobrowser", "-b", _opts[env]
+	local args = { "java", "-jar", _opts.jar_file, "-port", tostring(_opts[env].port), "-nobrowser", "-b", _opts[env]
 		.folder, "-nointeractive", "-r", env }
 
-	log.debug("command" .. vim.inspect(args))
+	local _, stderr, pid = runner.run(args, "aem_" .. env, {
+		cwd = _opts.aem_path,
+	})
 
-	local stdout = uv.new_pipe(false)
-	local stderr = uv.new_pipe(false)
-
-	log.debug("Starting AEM " .. env)
-	local handle, pid = uv.spawn("java", {
-		args = args,
-		stdio = { nil, stdout, stderr },
-		cwd = _opts.aem_path
-
-	}, function(code, signal)
-		if code ~= 0 then
-			vim.schedule(function()
-				log.debug(
-					"AEM " .. env .. " stopped with code " .. code .. " and signal " .. signal)
-			end)
-		end
-		stdout:read_stop()
-		stderr:read_stop()
-		stdout:close()
-		stderr:close()
-	end)
-
-	stdout:read_start(function(err, data)
-		if err then
-			vim.schedule(function()
-				log.debug("Error reading stdout: " .. err)
-			end)
-			return
-		end
-		if data then
-			vim.schedule(function()
-				log.debug("stdout: " .. data)
-			end)
-		end
-	end)
 	stderr:read_start(function(err, data)
 		if err then
 			vim.schedule(function()
-				log.debug("Error reading stderr: " .. err)
+				log.error("Error reading stderr: " .. err)
 			end)
 			return
 		end
 		if data then
 			vim.schedule(function()
-				log.debug("stderr: " .. data)
+				log.debug("["..env.."] stderr: " .. data)
 			end)
 		end
 	end)
 
 	log.debug("Started AEM " .. env .. " with pid " .. pid)
-
-	_G['aem_helper'][env] = {
-		pid = pid,
-		stdout = stdout,
-		stderr = stderr
-	}
-
-	vim.api.nvim_create_autocmd('VimLeavePre', {
-		group = au_group,
-		callback = function()
-			M.stop_aem(env)
-		end
-	})
 end
 
----
----@param env "author"|"publish"
-function M.stop_aem(env)
-	local pid = _G['aem_helper'][env].pid
-	log.debug("Stopping AEM " .. env)
-	vim.uv.kill(pid, "sigterm")
+function M.start_dispatcher()
+	--- @type AemHelperOpts
+	local _opts = _G['aem_helper'].opts;
+	-- TODO:
+end
+
+function M.launch()
+	vim.ui.select({ "all", "author + publish", "author", "publish", "dispatcher" }, {
+		prompt = "Select environment",
+	}, function(item)
+		vim.notify("Starting " .. item)
+		if item == "all" then
+			M.start_aem("author")
+			M.start_aem("publish")
+			M.start_dispatcher()
+		elseif item == "author + publish" then
+			M.start_aem("author")
+			M.start_aem("publish")
+		elseif item == "author" then
+			M.start_aem("author")
+		elseif item == "publish" then
+			M.start_aem("publish")
+		elseif item == "dispatcher" then
+			M.start_dispatcher()
+		end
+	end)
 end
 
 ---
 ---@param opts AemHelperOpts
 function M.setup(opts)
+	vim.g.aem_helper_debug = true
 	if opts == nil or opts.aem_path == nil then
 		log.error("aem_path is not set")
 		return
 	end
 
-	opts = vim.tbl_deep_extend("force", require("sync-aem.default_config"), opts)
+	opts = vim.tbl_deep_extend("force", require("aem-helper.default_config"), opts)
 	opts.aem_path = vim.fs.normalize(opts.aem_path)
 
+	-- TODO: Probably not needed to be global?
 	_G['aem_helper'] = _G['aem_helper'] or {}
 	_G['aem_helper']['opts'] = opts
 
 	log.debug("config" .. vim.inspect(_G['aem_helper'].opts))
 
 	-- NOTE: Testing only
-	vim.api.nvim_create_user_command('AEMTest', function() M.start_aem("author") end, {})
+	vim.api.nvim_create_user_command('AEMTest', function() M.launch() end, {})
 
 	-- -- LEGACY
 	-- vim.cmd([[
-	--        command! -nargs=? -complete=dir AEMExportFolder lua require('sync-aem').export_folder(<f-args>)
-	--        command! -nargs=? -complete=dir AEMImportFolder lua require('sync-aem').import_folder(<f-args>)
-	--        command! AEMExportFile lua require('sync-aem').export_file()
-	--        command! AEMImportFile lua require('sync-aem').import_file()
+	--        command! -nargs=? -complete=dir AEMExportFolder lua require('aem-helper').export_folder(<f-args>)
+	--        command! -nargs=? -complete=dir AEMImportFolder lua require('aem-helper').import_folder(<f-args>)
+	--        command! AEMExportFile lua require('aem-helper').export_file()
+	--        command! AEMImportFile lua require('aem-helper').import_file()
 	--    ]])
 end
 

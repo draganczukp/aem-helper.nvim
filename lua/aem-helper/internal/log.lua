@@ -1,7 +1,7 @@
 local M = {}
 
 M.log = function(level, msg)
-	print("[AEM-Helper] [" .. level .. "] " .. msg)
+	vim.notify("[AEM-Helper] [" .. level .. "] " .. msg)
 end
 
 M.debug = function(msg)
